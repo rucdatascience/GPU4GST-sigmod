@@ -39,6 +39,11 @@ public:
 	index_t *scan_temp_sml; // store block sum
 	index_t *scan_temp_mid; // store block sum
 	index_t *scan_temp_lrg; // store block sum
+	
+	/*merge worklist counting*/
+	index_t *cat_thd_count_merge;
+	index_t *cat_thd_off_merge;
+	index_t *scan_temp_merge; // store block sum
 
 	/*worklist*/
 	vertex_t *worklist_sml;
@@ -50,6 +55,10 @@ public:
 	// vertex_t *worklist_sz_sml_d;
 	// vertex_t *worklist_sz_mid_d;
 	// vertex_t *worklist_sz_lrg_d;
+
+	/*merge worklist*/
+	vertex_t *worklist_merge;
+	volatile vertex_t *worklist_sz_merge;
 
 	/*thread bin
 	 * - for generate frontier queue while map
@@ -115,6 +124,10 @@ public:
 		// H_ERR(cudaMalloc((void **)&new_worklist_sml, VERT_SZ * width));
 		// H_ERR(cudaMalloc((void **)&new_worklist_mid, VERT_SZ * width));
 		// H_ERR(cudaMalloc((void **)&new_worklist_lrg, VERT_SZ * width));
+		
+		// Allocate merge worklist
+		H_ERR(cudaMalloc((void **)&worklist_merge, VERT_SZ * width));
+		H_ERR(cudaMalloc((void **)&worklist_sz_merge, sizeof(vertex_t)));
 		H_ERR(cudaMalloc((void **)&cat_thd_count_sml, CATE_SZ));
 		H_ERR(cudaMalloc((void **)&cat_thd_count_mid, CATE_SZ));
 		H_ERR(cudaMalloc((void **)&cat_thd_count_lrg, CATE_SZ));
@@ -126,6 +139,11 @@ public:
 		H_ERR(cudaMalloc((void **)&scan_temp_sml, CATE_SZ));
 		H_ERR(cudaMalloc((void **)&scan_temp_mid, CATE_SZ));
 		H_ERR(cudaMalloc((void **)&scan_temp_lrg, CATE_SZ));
+		
+		// Allocate merge worklist counting variables
+		H_ERR(cudaMalloc((void **)&cat_thd_count_merge, CATE_SZ));
+		H_ERR(cudaMalloc((void **)&cat_thd_off_merge, CATE_SZ));
+		H_ERR(cudaMalloc((void **)&scan_temp_merge, CATE_SZ));
 
 		// verification purpose
 		H_ERR(cudaMallocHost((void **)&cat_thd_count_h, CATE_SZ));
@@ -185,6 +203,7 @@ public:
 		cudaFree(new_worklist_mid);
 		cudaFree(new_worklist_sml);
 		cudaFree(worklist_bin);
+		cudaFree(worklist_merge);
 		cudaFree(temp_st);
 		cudaFree(record);
 		cudaFree(lb_record);

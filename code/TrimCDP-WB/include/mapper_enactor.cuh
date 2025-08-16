@@ -157,14 +157,16 @@ balanced_push_kernel(
 
 	while (true)
 	{
-
+		
 		if (!TID)
 		{
+			//printf("-------------------------");
 			level[0]++;
 			level[2] = mdata.best[0];
 			mdata.worklist_sz_mid[0] = 0; // 下面应该是在扫描执行了 先把新的队列长度置0
 			mdata.worklist_sz_sml[0] = 0;
 			mdata.worklist_sz_lrg[0] = 0;
+			mdata.worklist_sz_merge[0] = 0; // 初始化merge队列
 		}
 		// worklist_gather._push_coalesced_scan_random_list(TID, wid_in_blk, tid_in_wrp, wcount_in_blk, GRNTY, level_thd+1);
 		worklist_gather._push_coalesced_scan_random_list_best_atomic(TID, wid_in_blk, tid_in_wrp, wcount_in_blk, GRNTY, level_thd + 1, mdata.record);
@@ -190,7 +192,8 @@ balanced_push_kernel(
 
 		// Three push mappers.
 
-		compute_mapper.mapper_push(
+		// Grow phase - 使用sml, mid, lrg三个队列
+		compute_mapper.mapper_push_grow(
 			mdata.worklist_sz_lrg[0],
 			mdata.worklist_lrg,
 			mdata.cat_thd_count_lrg,
@@ -200,7 +203,7 @@ balanced_push_kernel(
 			threadIdx.x, /*thread off intra group*/
 			level_thd, mdata.best, mdata.lb_record);
 
-		compute_mapper.mapper_push(
+		compute_mapper.mapper_push_grow(
 			mdata.worklist_sz_mid[0],
 			mdata.worklist_mid,
 			mdata.cat_thd_count_mid,
@@ -211,10 +214,20 @@ balanced_push_kernel(
 			tid_in_wrp, /*thread off intra group*/
 			level_thd, mdata.best, mdata.lb_record);
 
-		compute_mapper.mapper_push(
+		compute_mapper.mapper_push_grow(
 			mdata.worklist_sz_sml[0],
 			mdata.worklist_sml,
 			mdata.cat_thd_count_sml,
+			TID,   /*group id*/
+			1,	   /*group size*/
+			GRNTY, /*group count*/
+			0,	   /*thread off intra group*/
+			level_thd, mdata.best, mdata.lb_record);
+
+		// Merge phase - 使用merge队列
+		compute_mapper.mapper_push_merge(
+			mdata.worklist_sz_merge[0],
+			mdata.worklist_merge,
 			TID,   /*group id*/
 			1,	   /*group size*/
 			GRNTY, /*group count*/
@@ -225,7 +238,8 @@ balanced_push_kernel(
 
 		_grid_sum<vertex_t, index_t>(mdata.cat_thd_count_sml[TID] +
 										 mdata.cat_thd_count_mid[TID] +
-										 mdata.cat_thd_count_lrg[TID],
+										 mdata.cat_thd_count_lrg[TID] +
+										 mdata.worklist_sz_merge[0],
 									 mdata.future_work);
 
 		global_barrier.sync_grid_opt();

@@ -28,10 +28,12 @@ public:
 	index_t *worklist_sml;
 	index_t *worklist_mid;
 	index_t *worklist_lrg;
+	index_t *worklist_merge;
 	int width, diameter;
 	volatile vertex_t *worklist_sz_sml;
 	volatile vertex_t *worklist_sz_mid;
 	volatile vertex_t *worklist_sz_lrg;
+	volatile vertex_t *worklist_sz_merge;
 	int VAL1, VAL2;
 	index_t *cat_thd_count_sml;
 	index_t *cat_thd_count_mid;
@@ -39,7 +41,13 @@ public:
 
 	cb_reducer vert_selector_push;
 	cb_reducer vert_selector_pull;
-
+	vertex_t *mother_d; // GPU端：子节点到父节点的映射
+	
+	/*大度数节点分割映射扩展*/
+	index_t *son_range_start_d;  // GPU端：每个节点的子节点范围起始位置
+	index_t *son_range_end_d;    // GPU端：每个节点的子节点范围结束位置
+	vertex_t *son_list_d;        // GPU端：所有子节点的列表
+index_t son_list_d_size;     // son_list_d数组的大小
 public:
 	// constructor
 	reducer(gpu_graph ggraph,
@@ -62,13 +70,21 @@ public:
 		worklist_lrg = mdata.worklist_lrg;
 		worklist_sz_sml = mdata.worklist_sz_sml;
 		worklist_sz_mid = mdata.worklist_sz_mid;
-		worklist_sz_lrg = mdata.worklist_sz_lrg;
-
+		worklist_sz_lrg = mdata.worklist_sz_lrg;	
+		worklist_merge = mdata.worklist_merge;
+		worklist_sz_merge = mdata.worklist_sz_merge;
 		vert_selector_push = user_reducer_push;
 		vert_selector_pull = user_reducer_pull;
 		cat_thd_count_sml = mdata.cat_thd_count_sml;
 		cat_thd_count_mid = mdata.cat_thd_count_mid;
 		cat_thd_count_lrg = mdata.cat_thd_count_lrg;
+				mother_d = ggraph.mother_d;
+		
+		/*大度数节点分割映射扩展*/
+		son_range_start_d = ggraph.son_range_start_d;
+		son_range_end_d = ggraph.son_range_end_d;
+		son_list_d = ggraph.son_list_d;
+		son_list_d_size = ggraph.son_list_d_size;
 	}
 
 public:
@@ -308,24 +324,44 @@ public:
 			if (vert_status[my_beg]!=vert_status_prev[my_beg])
 			{
 				int v = my_beg / VAL1;
+				int  d = my_beg % VAL2;
+
+				uint p = (my_beg - v * VAL1 - d) / VAL2;
 				index_t degree = beg_pos[v + 1] - beg_pos[v];
 				if (degree == 0)
 					continue;
-
+				int pos = atomicAdd((int*)worklist_sz_merge,1);
+					worklist_merge[pos] = my_beg;
 				if (degree < SML_MID)
 				{
 					int pos = atomicAdd((int*)worklist_sz_sml,1);
 					worklist_sml[pos] = my_beg;
 				}
-				else if (degree > MID_LRG)
+				else if (degree < 512)
+				{
+					int pos = atomicAdd((int*)worklist_sz_mid,1);
+					worklist_mid[pos] = my_beg;
+				}
+				else if(degree <= 1024)
 				{
 					int pos = atomicAdd((int*)worklist_sz_lrg,1);
 					worklist_lrg[pos] = my_beg;
 				}
 				else
 				{
-					int pos = atomicAdd((int*)worklist_sz_mid,1);
-					worklist_mid[pos] = my_beg;
+					// 大度数节点：将子节点加入lrg队列进行grow操作
+					// 使用start和end数组直接获取子节点范围
+					index_t target_start = son_range_start_d[v];
+					index_t target_end = son_range_end_d[v];
+					
+					// 将子节点加入lrg队列
+					//printf("target_start: %d, target_end: %d\n", target_start, target_end);
+					for (index_t k = target_start; k < target_end; k++) {
+						index_t target_son = k; // 子节点编号就是k
+						index_t son_queue_pos = target_son * VAL1 + p * VAL2 + d;
+						int pos = atomicAdd((int*)worklist_sz_lrg,1);
+						worklist_lrg[pos] = son_queue_pos;
+					}
 				}
 			}
 

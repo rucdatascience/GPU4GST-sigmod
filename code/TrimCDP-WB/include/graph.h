@@ -80,7 +80,9 @@ class graph
 		
 		/*大度数节点分割相关*/
 		std::vector<new_vert_t> mother_map;   // CPU端：子节点到父节点的映射
+		std::vector<new_vert_t> son_d_map;    // CPU端：节点到子节点的映射
 		std::vector<new_index_t> son_range_start_map;  // CPU端：每个节点的子节点范围起始位置
+		std::vector<new_index_t> son_range_end_map;    // CPU端：每个节点的子节点范围结束位置
 		std::vector<new_vert_t> son_list_map;          // CPU端：所有子节点的列表
 		std::vector<std::pair<new_index_t, new_index_t>> original_son_ranges;  // 原始子节点范围信息
 		new_index_t original_vert_count;      // 原始节点数量

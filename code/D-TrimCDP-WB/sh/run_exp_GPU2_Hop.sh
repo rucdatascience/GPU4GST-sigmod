@@ -1,12 +1,12 @@
-cd /home/lijiayu/gst6/code/D-TrimCDP-WB/build
-cmake .. -D CMAKE_CXX_COMPILER=/home/lijiayu/cc/gcc-9.3.0/bin/g++ -D CMAKE_C_COMPILER=/home/lijiayu/cc/gcc-9.3.0/bin/gcc
+cd /home/sunyahui/lijiayu/open/code/D-TrimCDP-WB/build
+cmake .. 
 make
 #sh /home/lijiayu/gst6/code/D-TrimCDP-WB/sh/run_exp_GPU2_Hop.sh
 #exe type path data_name T  D task_start_num(from 0) task_end_num
 # ./bin/D-TrimCDP-WB 2 /home/lijiayu/gst6/data/ Github 5 2 0 299
 # ./bin/D-TrimCDP-WB 2 /home/lijiayu/gst6/data/ Github 5 4 0 299
 
- ./bin/D-TrimCDP-WB 2 /home/lijiayu/gst6/data/ Twitch 3 5 0 100
+ ./bin/D-TrimCDP-WB 2 /home/sunyahui/lijiayu/open/data/ Github 3 5 0 100
 
 # ./bin/D-TrimCDP-WB 2 /home/lijiayu/gst6/data/ Reddit 5 2 0 299
 # ./bin/D-TrimCDP-WB 2 /home/lijiayu/gst6/data/ Reddit 5 4 0 299

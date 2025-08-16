@@ -145,7 +145,7 @@ new_vert_t,new_index_t,new_weight_t>::split_high_degree_vertices()
 	
 	std::cout << "Found " << high_degree_vertices.size() << " high-degree vertices (>1024)" << std::endl;
 	
-	// 第二步：计算需要增加的空间
+	// 第二步：计算需要增加的空间（包括分割节点）
 	new_vert_count = vert_count;
 	std::vector<new_index_t> split_counts; // 记录每个大度数节点需要分割成几个子节点
 	split_counts.resize(vert_count, 0);
@@ -154,23 +154,30 @@ new_vert_t,new_index_t,new_weight_t>::split_high_degree_vertices()
 		new_index_t degree = beg_pos[v + 1] - beg_pos[v];
 		new_index_t num_splits = (degree + 511) / 512; // 向上取整，确保每个子节点度 <= 512
 		split_counts[v] = num_splits;
-		new_vert_count += num_splits;
+		new_vert_count += num_splits; // 子节点
 	}
+	
+	// 为每个大度数节点组添加一个分割节点
+	new_vert_count += high_degree_vertices.size();
 	
 	std::cout << "new_vert_count: " << new_vert_count << std::endl;
 	
 	// 第三步：分配空间
 	mother_map.resize(new_vert_count);
+	son_d_map.resize(new_vert_count);
 	son_range_start_map.resize(new_vert_count);
+	son_range_end_map.resize(new_vert_count);
 	
 	// 第四步：初始化映射数组
 	// 首先，所有节点默认映射到自己
 	for (new_index_t i = 0; i < vert_count; i++) {
 		mother_map[i] = i;
+		son_d_map[i] = i;  // 节点默认映射到自己
 		son_range_start_map[i] = i;
+		son_range_end_map[i] = i; // 非大度数节点没有子节点，范围为空
 	}
 	
-	// 第五步：为每个大度数节点创建子节点
+	// 第五步：为每个大度数节点创建子节点和分割节点
 	new_index_t current_new_vertex = vert_count;
 	for (auto v : high_degree_vertices) {
 		new_index_t num_splits = split_counts[v];
@@ -178,24 +185,51 @@ new_vert_t,new_index_t,new_weight_t>::split_high_degree_vertices()
 		// 设置子节点范围起始位置
 		son_range_start_map[v] = current_new_vertex;
 		
+		// 设置大度数节点的son_d_map为第一个子节点
+		son_d_map[v] = current_new_vertex;
+		
 		// 创建子节点
 		for (new_index_t i = 0; i < num_splits; i++) {
 			mother_map[current_new_vertex] = v; // 子节点映射到父节点
+			son_d_map[current_new_vertex] = current_new_vertex; // 子节点映射到自己
 			current_new_vertex++;
 		}
 		
+		// 设置子节点范围结束位置
+		son_range_end_map[v] = current_new_vertex;
+		
+		// 创建分割节点（不映射到任何父节点，仅用于CSR分割）
+		mother_map[current_new_vertex] = -1; // 分割节点没有父节点
+		son_d_map[current_new_vertex] = current_new_vertex; // 分割节点映射到自己
+		current_new_vertex++;
+		
 		// 打印调试信息
-		// std::cout << "设置大度数点 " << v << " 的子节点范围: [" << son_range_start_map[v] 
-		// 		  << ", " << current_new_vertex << ")" << std::endl;
+		std::cout << "设置大度数点 " << v << " 的子节点范围: [" << son_range_start_map[v] 
+				  << ", " << (current_new_vertex - 1) << "] (分割节点: " << (current_new_vertex - 1) << ")" << std::endl;
 	}
-	
-	// std::cout << "son_range_start_map.size(): " << son_range_start_map.size() << std::endl;
 	
 	// 第六步：构建son_list_map - 类似CSR格式
 	son_list_map.clear();
 	for (new_index_t i = 0; i < original_vert_count; i++) {
 		new_index_t start = son_range_start_map[i];
-		new_index_t end = (i + 1 < original_vert_count) ? son_range_start_map[i + 1] : new_vert_count;
+		new_index_t end;
+		
+		// 检查是否是大度数点
+		new_index_t degree = beg_pos[i + 1] - beg_pos[i];
+		if (degree > 1024) {
+			// 大度数点：找到下一个大度数点的起始位置，或者到new_vert_count
+			end = new_vert_count;
+			for (auto v : high_degree_vertices) {
+				if (v > i) {
+					end = son_range_start_map[v];
+					break;
+				}
+			}
+		} else {
+			// 非大度数点：没有子节点，范围为空
+			end = start;
+		}
+		
 		// 确保索引在有效范围内
 		if (start < new_vert_count && end <= new_vert_count && start <= end) {
 			for (new_index_t j = start; j < end; j++) {
@@ -203,66 +237,49 @@ new_vert_t,new_index_t,new_weight_t>::split_high_degree_vertices()
 			}
 		}
 	}
-	// std::cout << "son_list_map.size(): " << son_list_map.size() << std::endl;
+	std::cout << "son_list_map.size(): " << son_list_map.size() << std::endl;
 	
-	// 第七步：对于新增的子节点，范围起始位置为自己
+	// 第七步：对于新增的子节点和分割节点，范围起始位置为自己
 	for (new_index_t i = original_vert_count; i < new_vert_count; i++) {
 		son_range_start_map[i] = i;
+		son_range_end_map[i] = i + 1; // 结束位置是下一个位置
+		son_d_map[i] = i;  // 子节点映射到自己
 	}
-	// std::cout << "son_range_start_map.size(): " << son_range_start_map.size() << std::endl;
+	std::cout << "son_range_start_map.size(): " << son_range_start_map.size() << std::endl;
 	
 	// 第八步：保存原始的子节点范围信息，用于后续打印
 	original_son_ranges.resize(original_vert_count);
 	for (new_index_t i = 0; i < original_vert_count; i++) {
 		new_index_t start = son_range_start_map[i];
-		new_index_t end = (i + 1 < original_vert_count) ? son_range_start_map[i + 1] : new_vert_count;
+		new_index_t end;
+		
+		// 检查是否是大度数点
+		new_index_t degree = beg_pos[i + 1] - beg_pos[i];
+		if (degree > 1024) {
+			// 大度数点：找到下一个大度数点的起始位置，或者到new_vert_count
+			end = new_vert_count;
+			for (auto v : high_degree_vertices) {
+				if (v > i) {
+					end = son_range_start_map[v];
+					break;
+				}
+			}
+		} else {
+			// 非大度数点：没有子节点，范围为空
+			end = start;
+		}
+		
 		original_son_ranges[i] = std::make_pair(start, end);
 		
 		// 打印调试信息
-		// if (end - start>1024) {
-		// 	std::cout << "节点 " << i << " 的子节点范围: [" << start << ", " << end << ")" << std::endl;
-		// }
-		// if(end<start)
-		// {
-		// 	std::cout<<"end<start "<<i<<" "<<start<<" "<<end<<std::endl;
-		// }
+		if (end - start > 1024) {
+			std::cout << "节点 " << i << " 的子节点范围: [" << start << ", " << end << ")" << std::endl;
+		}
+		if(end < start)
+		{
+			std::cout<<"end<start "<<i<<" "<<start<<" "<<end<<std::endl;
+		}
 	}
-	
-	// 打印前5个大度数点的分割信息
-	// std::cout << "\n=== 前5个大度数点分割信息 ===" << std::endl;
-	// int print_count = 0;
-	// for (auto v : high_degree_vertices) {
-	// 	if (print_count >= 5) break;
-	// 	
-	// 	new_index_t degree = beg_pos[v + 1] - beg_pos[v];
-	// 	new_index_t num_splits = split_counts[v];
-	// 	new_index_t start_son = original_son_ranges[v].first;
-	// 	new_index_t end_son = original_son_ranges[v].second;
-	// 	
-	// 	std::cout << "大度数点 " << v << " (度数: " << degree << "):" << std::endl;
-	// 	std::cout << "  分割成 " << num_splits << " 个子节点" << std::endl;
-	// 	std::cout << "  子节点范围: [" << start_son << ", " << end_son << ")" << std::endl;
-	// 	std::cout << "  子节点列表: ";
-	// 	
-	// 	// 打印子节点列表
-	// 	for (new_index_t i = start_son; i < end_son && i < new_vert_count; i++) {
-	// 		std::cout << i;
-	// 		if (i < end_son - 1 && i < new_vert_count - 1) {
-	// 			std::cout << ", ";
-	// 		}
-	// 	}
-	// 	std::cout << std::endl;
-	// 	
-	// 	// 打印每个子节点的映射信息
-	// 	std::cout << "  子节点映射信息:" << std::endl;
-	// 	for (new_index_t i = start_son; i < end_son && i < new_vert_count; i++) {
-	// 		std::cout << "    子节点 " << i << ": mother_map=" << mother_map[i] 
-	// 				  << ", son_range_start=" << son_range_start_map[i] << std::endl;
-	// 	}
-	// 	std::cout << std::endl;
-	// 	
-	// 	print_count++;
-	// }
 }
 
 template<
@@ -271,72 +288,82 @@ typename new_vert_t, typename new_index_t, typename new_weight_t>
 void graph<file_vert_t,file_index_t, file_weight_t,
 new_vert_t,new_index_t,new_weight_t>::build_new_csr()
 {
-	// 计算新的边数量
-	new_edge_count = 0;
+	std::cout << "开始构建新的CSR..." << std::endl;
+	
+	// 保存原始数据用于验证
+	std::vector<new_index_t> original_beg_pos(beg_pos, beg_pos + original_vert_count + 1);
+	std::vector<new_vert_t> original_adj_list(adj_list, adj_list + edge_count);
+	std::vector<new_weight_t> original_weight(weight, weight + edge_count);
+	
+	// 第一步：计算新的边数量
+	new_edge_count = edge_count; // 原始边数保持不变
 	for (new_index_t i = 0; i < original_vert_count; i++) {
-		new_index_t degree = beg_pos[i + 1] - beg_pos[i];
+		new_index_t degree = original_beg_pos[i + 1] - original_beg_pos[i];
 		if (degree > 1024) {
-			// 大度数节点：只为子节点创建边表，不保留原始边表
-			new_edge_count += degree; // 只计算子节点的边表
-		} else {
-			// 普通节点：边数量不变
-			new_edge_count += degree;
+			// 大度数节点：子节点指向父节点边表的子集，不增加新的边
+			// 子节点只是重新组织父节点的边表，不复制边
 		}
 	}
 	
-	// 分配新的CSR数组
+	std::cout << "原始边数: " << edge_count << ", 新边数: " << new_edge_count << std::endl;
+	
+	// 第二步：分配新的CSR数组
 	new_beg_pos = new new_index_t[new_vert_count + 1];
 	new_adj_list = new new_vert_t[new_edge_count];
 	new_weight = new new_weight_t[new_edge_count];
 	
-	// 构建新的CSR
-	new_index_t edge_offset = 0;
-	new_index_t vertex_offset = original_vert_count;
+	// 第三步：构建新的CSR
+	// 首先复制所有原始边表（保持位置不变）
+	for (new_index_t i = 0; i < edge_count; i++) {
+		new_adj_list[i] = original_adj_list[i];
+		new_weight[i] = original_weight[i];
+	}
 	
+	// 复制所有原始节点的beg_pos（保持位置不变）
+	for (new_index_t i = 0; i < original_vert_count + 1; i++) {
+		new_beg_pos[i] = original_beg_pos[i];
+	}
+	
+	// 然后为子节点设置beg_pos，指向父节点边表的子集
+	new_index_t vertex_offset = original_vert_count;
 	for (new_index_t i = 0; i < original_vert_count; i++) {
-		new_index_t degree = beg_pos[i + 1] - beg_pos[i];
+		new_index_t degree = original_beg_pos[i + 1] - original_beg_pos[i];
 		
 		if (degree > 1024) {
-			// 大度数节点：不保留原始边表，只创建子节点
-			// 大度数节点映射到第一个子节点
-			new_index_t first_son = original_son_ranges[i].first;
-			new_beg_pos[i] = edge_offset; // 大度数节点指向第一个子节点的边表起始位置
+			// 大度数节点：为子节点设置beg_pos
+			std::cout << "处理大度数点 " << i << " (度数: " << degree << ")" << std::endl;
 			
-			// 为子节点复制边表
-			new_index_t num_splits = (degree + 511) / 512;
-			new_index_t edges_per_split = degree / num_splits;
-			new_index_t remaining_edges = degree % num_splits;
+			new_index_t num_splits = (degree + 511) / 512; // 向上取整
 			
-			new_index_t current_edge = beg_pos[i];
+			new_index_t processed_edges = 0;
 			for (new_index_t j = 0; j < num_splits; j++) {
-				new_index_t split_degree = edges_per_split + (j < remaining_edges ? 1 : 0);
-				new_beg_pos[vertex_offset + j] = edge_offset;
-				
-				// 复制边到子节点
-				for (new_index_t k = 0; k < split_degree; k++) {
-					new_adj_list[edge_offset + k] = adj_list[current_edge + k];
-					new_weight[edge_offset + k] = weight[current_edge + k];
+				// 计算当前子节点的边数
+				new_index_t edges_for_this_son;
+				if (j == num_splits - 1) {
+					// 最后一个子节点处理剩余的所有边
+					edges_for_this_son = degree - processed_edges;
+				} else {
+					// 其他子节点处理512条边
+					edges_for_this_son = 512;
 				}
 				
-				edge_offset += split_degree;
-				current_edge += split_degree;
+				// 设置子节点的beg_pos，指向父节点边表的子集
+				new_beg_pos[vertex_offset + j] = original_beg_pos[i] + processed_edges;
+				
+				processed_edges += edges_for_this_son;
 			}
-			vertex_offset += num_splits;
-		} else {
-			// 普通节点：直接复制
-			new_beg_pos[i] = edge_offset;
-			for (new_index_t j = 0; j < degree; j++) {
-				new_adj_list[edge_offset + j] = adj_list[beg_pos[i] + j];
-				new_weight[edge_offset + j] = weight[beg_pos[i] + j];
-			}
-			edge_offset += degree;
+			
+			// 设置分割节点的beg_pos（没有边）
+			new_beg_pos[vertex_offset + num_splits] = original_beg_pos[i] + degree; // 指向父节点边表的末尾
+			
+			vertex_offset += num_splits + 1; // +1 包括分割节点
 		}
 	}
 	
 	// 设置最后一个起始位置
-	new_beg_pos[new_vert_count] = edge_offset;
+	new_beg_pos[new_vert_count] = edge_count;
 	
-	// 更新图的CSR数据为新的分割后的数据
+	// 第四步：更新图的CSR数据
 	delete[] adj_list;
 	delete[] beg_pos;
 	delete[] weight;
@@ -344,78 +371,209 @@ new_vert_t,new_index_t,new_weight_t>::build_new_csr()
 	adj_list = new_adj_list;
 	beg_pos = new_beg_pos;
 	weight = new_weight;
-	vert_count = new_vert_count;
+	// 保持原始vertex_count不变，子节点只在grow中使用
+	// vert_count = new_vert_count; // 注释掉这行，保持原始vertex_count
 	edge_count = new_edge_count;
 	
-	std::cout << "New CSR built: " << new_vert_count << " vertices, " << new_edge_count << " edges" << std::endl;
+	std::cout << "新CSR构建完成: 原始顶点数 " << vert_count << ", 扩展顶点数 " << new_vert_count << ", " << new_edge_count << " 条边" << std::endl;
 	
 	// 打印分割后前5个大度数点的子节点在新CSR中的信息
-	// std::cout << "\n=== 分割后前5个大度数点的子节点CSR信息 ===" << std::endl;
-	// int print_count = 0;
-	// for (new_index_t i = 0; i < original_vert_count; i++) {
-	// 	new_index_t degree = beg_pos[i + 1] - beg_pos[i];
-	// 	if (degree > 1024) {
-	// 		if (print_count >= 5) break;
-	// 		
-	// 		std::cout << "大度数点 " << i << " (度数: " << degree << "):" << std::endl;
-	// 		std::cout << "  原始beg_pos: [" << beg_pos[i] << ", " << beg_pos[i + 1] << ")" << std::endl;
-	// 		
-	// 		// 找到对应的子节点
-	// 		new_index_t start_son = original_son_ranges[i].first;
-	// 		new_index_t end_son = original_son_ranges[i].second;
-	// 		
-	// 		std::cout << "  子节点范围: [" << start_son << ", " << end_son << ")" << std::endl;
-	// 		
-	// 		// 打印每个子节点的beg_pos信息
-	// 		for (new_index_t j = start_son; j < end_son && j < new_vert_count; j++) {
-	// 			if (j + 1 < new_vert_count) {
-	// 				std::cout << "    子节点 " << j << ": beg_pos[" << j << "]=" << beg_pos[j] 
-	// 						  << ", beg_pos[" << j + 1 << "]=" << beg_pos[j + 1] 
-	// 						  << " (度数: " << beg_pos[j + 1] - beg_pos[j] << ")" << std::endl;
-	// 			}
-	// 		}
-	// 		
-	// 		// 打印父节点分割给子节点的实际边信息
-	// 		std::cout << "  父节点分割给子节点的边信息:" << std::endl;
-	// 		
-	// 		// 保存原始边信息用于打印
-	// 		std::vector<std::pair<new_vert_t, new_weight_t>> original_edges;
-	// 		for (new_index_t j = beg_pos[i]; j < beg_pos[i + 1]; j++) {
-	// 			original_edges.push_back(std::make_pair(adj_list[j], weight[j]));
-	// 		}
-	// 		
-	// 		// 打印前10条原始边
-	// 		std::cout << "    父节点 " << i << " 的前10条边: ";
-	// 		for (new_index_t j = 0; j < std::min((new_index_t)10, degree); j++) {
-	// 			std::cout << "(" << original_edges[j].first << ", " << original_edges[j].second << ")";
-	// 			if (j < std::min((new_index_t)9, degree - 1)) {
-	// 				std::cout << ", ";
-	// 			}
-	// 		}
-	// 		std::cout << std::endl;
-	// 		
-	// 		// 打印每个子节点的前10条边
-	// 		for (new_index_t j = start_son; j < end_son && j < new_vert_count; j++) {
-	// 			if (j + 1 < new_vert_count) {
-	// 				new_index_t son_degree = beg_pos[j + 1] - beg_pos[j];
-	// 				std::cout << "    子节点 " << j << " 的前" << std::min((new_index_t)10, son_degree) << "条边: ";
-	// 				
-	// 				for (new_index_t k = 0; k < std::min((new_index_t)10, son_degree); k++) {
-	// 					new_index_t edge_idx = beg_pos[j] + k;
-	// 					if (edge_idx < edge_count) {
-	// 						std::cout << "(" << adj_list[edge_idx] << ", " << weight[edge_idx] << ")";
-	// 						if (k < std::min((new_index_t)9, son_degree - 1)) {
-	// 							std::cout << ", ";
-	// 						}
-	// 					}
-	// 				}
-	// 				std::cout << std::endl;
-	// 			}
-	// 		}
-	// 		std::cout << std::endl;
-	// 		
-	// 		print_count++;
-	// 	}
-	// }
+	std::cout << "\n=== 验证分割结果 ===" << std::endl;
+	int print_count = 0;
+	for (new_index_t i = 0; i < original_vert_count; i++) {
+		new_index_t original_degree = original_beg_pos[i + 1] - original_beg_pos[i];
+		if (original_degree > 1024) {
+			if (print_count >= 5) break;
+			
+			std::cout << "\n大度数点 " << i << " (原始度数: " << original_degree << "):" << std::endl;
+			
+			// 使用start和end数组直接获取子节点范围
+			new_index_t start_son = son_range_start_map[i];
+			new_index_t end_son = son_range_end_map[i];
+			new_index_t num_sons = end_son - start_son;
+			
+			std::cout << "  子节点范围: [" << start_son << ", " << end_son << ") (共" << num_sons << "个子节点)" << std::endl;
+			
+			// 验证每个子节点的度数
+			new_index_t total_son_edges = 0;
+			for (new_index_t j = 0; j < num_sons; j++) {
+				new_index_t son_vertex = start_son + j;
+				if (son_vertex + 1 < new_vert_count) {
+					new_index_t son_degree = beg_pos[son_vertex + 1] - beg_pos[son_vertex];
+					total_son_edges += son_degree;
+				}
+			}
+			
+			// 验证总边数是否匹配
+			std::cout << "  验证: 原始父节点 " << original_degree << " 条边, 子节点总计 " << total_son_edges << " 条边 ";
+			if (original_degree == total_son_edges) {
+				std::cout << "✓" << std::endl;
+			} else {
+				std::cout << "✗" << std::endl;
+			}
+			
+			// 验证子节点度数是否符合512分割规则
+			std::cout << "  512分割验证: ";
+			bool split_correct = true;
+			for (new_index_t j = 0; j < num_sons; j++) {
+				new_index_t son_vertex = start_son + j;
+				if (son_vertex + 1 < new_vert_count) {
+					new_index_t son_degree = beg_pos[son_vertex + 1] - beg_pos[son_vertex];
+					if (j < num_sons - 1 && son_degree != 512) {
+						split_correct = false;
+						break;
+					}
+					if (j == num_sons - 1 && son_degree > 512) {
+						split_correct = false;
+						break;
+					}
+				}
+			}
+			std::cout << (split_correct ? "✓" : "✗") << std::endl;
+			
+			// 验证父节点映射正确性
+			std::cout << "  父节点映射验证: ";
+			bool parent_mapping_correct = true;
+			for (new_index_t j = 0; j < num_sons; j++) {
+				new_index_t son_vertex = start_son + j;
+				if (mother_map[son_vertex] != i) {
+					parent_mapping_correct = false;
+					break;
+				}
+			}
+			std::cout << (parent_mapping_correct ? "✓" : "✗") << std::endl;
+			
+			// 打印大度数点和子节点的边信息对比
+			std::cout << "  边信息对比:" << std::endl;
+			
+			// 打印父节点的前5条边
+			std::cout << "    父节点 " << i << " 前5条边: ";
+			new_index_t parent_beg = beg_pos[i];
+			new_index_t parent_end = beg_pos[i + 1];
+			new_index_t print_count_edges = 0;
+			for (new_index_t j = parent_beg; j < parent_end && print_count_edges < 5; j++) {
+				std::cout << "(" << adj_list[j] << "," << weight[j] << ")";
+				if (j < parent_end - 1 && print_count_edges < 4) std::cout << " ";
+				print_count_edges++;
+			}
+			std::cout << std::endl;
+			
+			// 打印父节点的最后5条边
+			std::cout << "    父节点 " << i << " 最后5条边: ";
+			print_count_edges = 0;
+			for (new_index_t j = parent_end - 1; j >= parent_beg && print_count_edges < 5; j--) {
+				std::cout << "(" << adj_list[j] << "," << weight[j] << ")";
+				if (j > parent_beg && print_count_edges < 4) std::cout << " ";
+				print_count_edges++;
+			}
+			std::cout << std::endl;
+			
+			// 打印第一个子节点的前5条边
+			if (num_sons > 0) {
+				new_index_t first_son = start_son;
+				new_index_t first_son_beg = beg_pos[first_son];
+				new_index_t first_son_end = beg_pos[first_son + 1];
+				std::cout << "    第一个子节点 " << first_son << " 前5条边: ";
+				print_count_edges = 0;
+				for (new_index_t j = first_son_beg; j < first_son_end && print_count_edges < 5; j++) {
+					std::cout << "(" << adj_list[j] << "," << weight[j] << ")";
+					if (j < first_son_end - 1 && print_count_edges < 4) std::cout << " ";
+					print_count_edges++;
+				}
+				std::cout << std::endl;
+			}
+			
+			// 打印最后一个子节点的最后5条边
+			if (num_sons > 0) {
+				new_index_t last_son = start_son + num_sons - 1;
+				new_index_t last_son_beg = beg_pos[last_son];
+				new_index_t last_son_end = beg_pos[last_son + 1];
+				std::cout << "    最后一个子节点 " << last_son << " 最后5条边: ";
+				print_count_edges = 0;
+				for (new_index_t j = last_son_end - 1; j >= last_son_beg && print_count_edges < 5; j--) {
+					std::cout << "(" << adj_list[j] << "," << weight[j] << ")";
+					if (j > last_son_beg && print_count_edges < 4) std::cout << " ";
+					print_count_edges++;
+				}
+				std::cout << std::endl;
+			}
+			
+			print_count++;
+		}
+	}
+	
+	// 特判打印37701子节点的所有信息
+	std::cout << "\n=== 特判打印37701子节点信息 ===" << std::endl;
+	
+	// 直接检查37701子节点
+	new_index_t son_vertex = 37701;
+	
+	// 检查37701是否在有效范围内
+	if (son_vertex < new_vert_count) {
+		std::cout << "\n37701子节点详细信息:" << std::endl;
+		
+		// 获取父节点
+		new_index_t parent_vertex = mother_map[son_vertex];
+		std::cout << "  父节点: mother_map[" << son_vertex << "]=" << parent_vertex << std::endl;
+		
+		// 获取子节点的CSR信息
+		new_index_t son_beg = beg_pos[son_vertex];
+		new_index_t son_end = beg_pos[son_vertex + 1];
+		new_index_t son_degree = son_end - son_beg;
+		
+		std::cout << "  CSR位置: beg_pos[" << son_vertex << "]=" << son_beg << ", beg_pos[" << (son_vertex+1) << "]=" << son_end << std::endl;
+		std::cout << "  度数: " << son_degree << std::endl;
+		std::cout << "  子节点映射: son_d_map[" << son_vertex << "]=" << son_d_map[son_vertex] << std::endl;
+		
+		// 打印37701子节点的所有边
+		std::cout << "  所有边: ";
+		for (new_index_t j = son_beg; j < son_end; j++) {
+			std::cout << "(" << adj_list[j] << "," << weight[j] << ")";
+			if (j < son_end - 1) std::cout << " ";
+		}
+		std::cout << std::endl;
+		
+		// 验证37701子节点在父节点边表中的位置
+		if (parent_vertex < original_vert_count) {
+			new_index_t parent_beg = beg_pos[parent_vertex];
+			new_index_t parent_end = beg_pos[parent_vertex + 1];
+			new_index_t parent_degree = parent_end - parent_beg;
+			
+			std::cout << "  父节点" << parent_vertex << "信息:" << std::endl;
+			std::cout << "    原始度数: " << parent_degree << std::endl;
+			std::cout << "    边表范围: [" << parent_beg << ", " << parent_end << ")" << std::endl;
+			std::cout << "    37701子节点边表范围: [" << son_beg << ", " << son_end << ")" << std::endl;
+			
+			// 验证37701子节点的边是否确实是父节点边表的子集
+			bool is_subset = true;
+			for (new_index_t j = son_beg; j < son_end; j++) {
+				if (j < parent_beg || j >= parent_end) {
+					is_subset = false;
+					break;
+				}
+			}
+			std::cout << "    是否为父节点边表子集: " << (is_subset ? "✓" : "✗") << std::endl;
+			
+			// 检查父节点的子节点范围
+			new_index_t start_son = son_range_start_map[parent_vertex];
+			new_index_t end_son = son_range_end_map[parent_vertex];
+			new_index_t num_sons = end_son - start_son;
+			
+			std::cout << "    父节点子节点范围: [" << start_son << ", " << end_son << ") (共" << num_sons << "个子节点)" << std::endl;
+			
+			// 检查37701在父节点子节点范围中的位置
+			bool in_range = (son_vertex >= start_son && son_vertex < end_son);
+			std::cout << "    37701是否在父节点子节点范围内: " << (in_range ? "✓" : "✗") << std::endl;
+			
+			if (in_range) {
+				new_index_t son_index = son_vertex - start_son;
+				std::cout << "    37701是父节点的第" << son_index << "个子节点" << std::endl;
+			}
+		} else {
+			std::cout << "  警告: 父节点" << parent_vertex << "超出原始顶点范围" << std::endl;
+		}
+	} else {
+		std::cout << "  警告: 37701超出扩展顶点范围" << std::endl;
+	}
 }
 
