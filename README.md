@@ -108,11 +108,30 @@ This command will execute 300 queries (from index 0 to 299) of size 3 on the Mus
 ## GST_code
 All codes are located in the 'code' folder. There are 2 subfolders, each corresponding to codes of one of 2 algorithms in the paper.
 
-### Basic Algorithms:
+### Basic Algorithms (without diameter constraints):
+- **PrunedDP++**. This is the PrunedDP++ version code of GST without diameter constraints.
 - **TrimCDP-WB**. This is the TrimCDP-WB version code without diameter constraint for GST.
+
+### Basic Algorithms (with diameter constraints):
+- **D-PrunedDP++**. This is the PrunedDP++ version code with diameter constraints for GST.
 - **D-TrimCDP-WB**. This is the TrimCDP-WB version code with diameter constraints for GST.
 
-In the 2 subfolders, there are .h, .cu, .cuh, and .cpp files used for conducting experiments in the paper. The .h and .cuh files are in the "include" directory, while the .cpp files are in the "src" directory. The explanations for them are as follows.
+### Optimization Analysis Algorithms (without diameter constraints):
+- **TrimCDP-WB-no_virtual_split**. This is the TrimCDP-WB version code without virtual splitting optimization.
+
+### Optimization Analysis Algorithms (with diameter constraints):
+- **D-TrimCDP-WB-no_virtual_split**. This is the TrimCDP-WB version code without virtual splitting optimization, with diameter constraints.
+
+In the 6 subfolders, there are .h, .cu, .cuh, and .cpp files used for conducting experiments in the paper. The .h and .cuh files are in the "include" directory, while the .cpp files are in the "src" directory. The explanations for them are as follows.
+
+### PrunedDP++:
+- "PrunedDP++/src/main.cpp" contains codes for conducting experiments for PrunedDP++. 
+- "PrunedDP++/include/CPUNONHOP.h" contains codes of PrunedDP++.
+
+The command to run this experiment is:
+ ```
+sh sh/exp_prunedDP++.sh
+ ```
 
 ### TrimCDP-WB:
 - "TrimCDP-WB/src/GSTnonHop.cu" contains codes for conducting experiments for TrimCDP-WB. 
@@ -125,6 +144,15 @@ The command to run this experiment is:
 sh sh/exp_TrimCDP-WB.sh
  ```
 
+### D-PrunedDP++:
+- "D-PrunedDP++/src/main.cpp" contains codes for conducting experiments for D-PrunedDP++. 
+- "D-PrunedDP++/include/CPUHOP.h" contains codes of D-PrunedDP++.
+
+The command to run this experiment is:
+ ```
+sh sh/exp_D-prunedDP++.sh
+ ```
+
 ### D-TrimCDP-WB:
 - "D-TrimCDP-WB/src/GPUHop.cu" contains codes for conducting experiments for D-TrimCDP-WB. 
 - "D-TrimCDP-WB/include/mapper_enactor.cuh" contains the overall framework of D-TrimCDP-WB.
@@ -134,6 +162,28 @@ sh sh/exp_TrimCDP-WB.sh
 The command to run this experiment is:
  ```
 sh sh/exp_D-TrimCDP-WB.sh
+ ```
+
+### TrimCDP-WB-no_virtual_split:
+- "TrimCDP-WB-no_virtual_split/src/GSTnonHop.cu" contains codes for conducting experiments for TrimCDP-WB without virtual splitting optimization.
+- "TrimCDP-WB-no_virtual_split/include/mapper_enactor.cuh" contains the overall framework of TrimCDP-WB without virtual splitting.
+- "TrimCDP-WB-no_virtual_split/include/mapper.cuh" contains codes for performing specific operations on vertices without virtual splitting.
+- "TrimCDP-WB-no_virtual_split/include/reducer.cuh" contains codes for organizing and allocating work after completing vertices operations.
+
+The command to run this experiment is:
+ ```
+sh sh/exp_TrimCDP-WB-no_virtual_split.sh
+ ```
+
+### D-TrimCDP-WB-no_virtual_split:
+- "D-TrimCDP-WB-no_virtual_split/src/GPUHop.cu" contains codes for conducting experiments for D-TrimCDP-WB without virtual splitting optimization.
+- "D-TrimCDP-WB-no_virtual_split/include/mapper_enactor.cuh" contains the overall framework of D-TrimCDP-WB without virtual splitting.
+- "D-TrimCDP-WB-no_virtual_split/include/mapper.cuh" contains codes for performing specific operations on vertices without virtual splitting.
+- "D-TrimCDP-WB-no_virtual_split/include/reducer.cuh" contains codes for organizing and allocating work after completing vertices operations.
+
+The command to run this experiment is:
+ ```
+sh sh/exp_D-TrimCDP-WB-no_virtual_split.sh
  ```
 
 
