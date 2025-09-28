@@ -5,7 +5,6 @@ cmake ..
 make
 #exe type path data_name T task_start_num(from 0) task_end_num
 
-
 ./bin/TrimCDP-WB 2 ../../../data/ Musae 3 0 299
 ./bin/TrimCDP-WB 2 ../../../data/ Musae 5 0 299
 ./bin/TrimCDP-WB 2 ../../../data/ Musae 7 0 299

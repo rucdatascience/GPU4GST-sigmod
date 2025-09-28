@@ -11,6 +11,13 @@ Here, we show how to build and run experiments on a Linux server with the `Ubunt
 - CMake version 3.28.3
 - Boost 1.85.0
 
+Use following commands to test partly:
+```
+gcc -v
+nvcc --version
+cmake --version
+```
+
 Please note:
 
 - The CMake version should be 3.27 or above.
@@ -78,7 +85,7 @@ This command verifies the integrity and proper placement of all required dataset
 
 ## Experiments
 
-**The result will store into "data/result/". Before running the scripts, you should keep the directory clean.**
+**The result will store into "data/result/" and cover it. Before running the scripts, you should backup this directory.**
 
 ### Without diameter constraints
 

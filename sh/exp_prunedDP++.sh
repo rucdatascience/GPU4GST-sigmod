@@ -4,7 +4,8 @@ cd build
 cmake ..
 make
 #exe type path data_name T task_start_num(from 0) task_end_num
-#./bin/PrunedDP++ 1 ../../../data/ Twitch 3 0 49
+# ./bin/PrunedDP++ 1 ../../../data/ Twitch 3 0 49
+
 ./bin/PrunedDP++ 1 ../../../data/ Musae 3 0 299&
 ./bin/PrunedDP++ 1 ../../../data/ Musae 5 0 299&
 ./bin/PrunedDP++ 1 ../../../data/ Musae 7 0 299&
@@ -33,6 +34,6 @@ make
 ./bin/PrunedDP++ 1 ../../../data/ Reddit 5 0 299&
 ./bin/PrunedDP++ 1 ../../../data/ Reddit 7 0 299
 
-./bin/PrunedDP++ 1 ../../../data/ LiveJournal  3 0 299&
+./bin/PrunedDP++ 1 ../../../data/  LiveJournal  3 0 299&
 ./bin/PrunedDP++ 1 ../../../data/  LiveJournal  5 0 299&
 ./bin/PrunedDP++ 1 ../../../data/  LiveJournal 7 0 299&

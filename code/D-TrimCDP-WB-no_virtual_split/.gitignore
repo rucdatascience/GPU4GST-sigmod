@@ -1,5 +1,2 @@
 build/
-data/
-res/
-.dist/
-cpu_alg/
+.vscode/
