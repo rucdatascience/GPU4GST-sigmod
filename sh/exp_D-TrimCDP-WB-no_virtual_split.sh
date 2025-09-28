@@ -1,4 +1,6 @@
-cd code/D-TrimCDP-WB-no_virtual_split/build
+cd code/D-TrimCDP-WB-no_virtual_split
+mkdir build
+cd build
 cmake ..
 make
 #sh sh/exp_D-TrimCDP-WB.sh

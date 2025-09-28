@@ -154,7 +154,7 @@ int main(int args, char **argv)
 	outputFile.precision(8);
 	outputFile.setf(ios::fixed);
 	outputFile.setf(ios::showpoint);
-	outputFile.open(path+"D-KF-NoSM/exp_GPU2_Hop_" + data_name + "_T" + to_string(T) + "_" + "D" + to_string(D) + "_" + to_string(task_start_num) + "-" + to_string(task_end_num) + ".csv");
+	outputFile.open(path+"result/exp_no_virtual_split_GPU2_Hop_" + data_name + "_T" + to_string(T) + "_" + "D" + to_string(D) + "_" + to_string(task_start_num) + "-" + to_string(task_end_num) + ".csv");
 
 	outputFile << "task_ID,task,GPU2_Hop_time,GPU2_Hop_cost,GPU2_Hop_memory,counts,process_num" << endl;
 
