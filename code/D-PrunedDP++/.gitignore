@@ -1,7 +1,2 @@
 build/
-CLB/
-.json
-build
-.vscode
-CLB
-data/
+.vscode/

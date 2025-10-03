@@ -11,9 +11,17 @@ Here, we show how to build and run experiments on a Linux server with the `Ubunt
 - CMake version 3.28.3
 - Boost 1.85.0
 
+Use following commands to test partly:
+```
+gcc -v
+nvcc --version
+cmake --version
+```
+
 Please note:
 
 - The CMake version should be 3.27 or above.
+- **If compiled well but the program is frozen at the iteration 0, please check your gcc version and nvcc version.**
 - In the above environment, if you need to run GPU code, it is recommended to install the corresponding CUDA version to avoid possible compilation errors caused by version incompatibility.
 - **Because the instructions in the CMake file will download some external libraries such as rapids-cmake, so please run the following mentioned sh command on a machine with network connection.**
 
@@ -32,6 +40,7 @@ This command will download the dependencies, build all needed algorithms and run
 **Download the datasets from [OneDrive](https://1drv.ms/f/c/683d9dd9f262486b/Ek6Fl_brQzhDnI2cmhGIHxMBQ-L1ApeSqxwZKE4NBsDXSQ?e=3RBc8S) into the "data" folder in advance** **(You can click the "Download" button at the top of this page to download the zip of all files. There is no need to download one by one)**. **Each dataset includes 8 parts. For testing, ensure all parts are downloaded to the data directory.**
 
 If you meet problem like:
+
 ```
 Archive:  OneDrive_2_2025-9-28.zip
 warning [OneDrive_2_2025-9-28.zip]:  2236006777 extra bytes at beginning or within zipfile
@@ -41,6 +50,7 @@ error [OneDrive_2_2025-9-28.zip]:  start of central directory not found;
   (please check that you have transferred or created the zipfile in the
   appropriate BINARY mode and that you have compiled UnZip properly)
 ```
+
 Try to use `7z` to extract files rather than `unzip`.
 
 Please note that "data" is the default path for storing the dataset. We have already provided the Twitch dataset in the "data" folder in advance. Please store the other datasets in a similar manner. 
@@ -75,7 +85,7 @@ This command verifies the integrity and proper placement of all required dataset
 
 ## Experiments
 
-**The result will store into "data/result/". Before running the scripts, you should keep the directory clean.**
+**The result will store into "data/result/" and cover it. Before running the scripts, you should backup this directory.**
 
 ### Without diameter constraints
 
@@ -184,7 +194,7 @@ The explanation of the last line of instructions is as follows:
 | Parameter             | Description                                                  |
 | --------------------- | ------------------------------------------------------------ |
 | `./tuple_text_to_bin` | Execute binary files                                         |
-| `Twitch`           | The name of the dataset to be converted. The corresponding filename is `Twitch.in`                 |
+| `Twitch`              | The name of the dataset to be converted. The corresponding filename is `Twitch.in` |
 | `1`                   | 0 indicates that the graph is a directed graph, while 1 indicates that the graph is an undirected graph. |
 | `1`                   | Indicates to ignore the first line. If you need to ignore more lines, you can modify this parameter. |
 
@@ -212,4 +222,3 @@ The detailed explanation for this line is as follows:
 | `5`                  | Upper bound for the diameter constraint of the solution tree |
 | `0`                  | Starting index of queries to execute                         |
 | `299`                | Ending index of queries to execute                           |
-
