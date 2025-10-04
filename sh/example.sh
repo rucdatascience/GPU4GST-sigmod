@@ -3,14 +3,14 @@ mkdir build
 cd build
 cmake ..
 make 
-./bin/D-PrunedDP++ 2 ../../../data/ Twitch 3 4 0 50
+./bin/D-PrunedDP++ 2 ../../../data/ Twitch 3 5 0 50
 
 cd ../../../code/D-TrimCDP-WB
 mkdir build
 cd build
 cmake ..
 make 
-./bin/D-TrimCDP-WB 2 ../../../data/ Twitch 3 4 0 50
+./bin/D-TrimCDP-WB 2 ../../../data/ Twitch 3 5 0 50
 
 
 cd ../../../code/D-TrimCDP-WB-no_virtual_split
@@ -18,7 +18,7 @@ mkdir build
 cd build
 cmake ..
 make 
-./bin/D-TrimCDP-WB 2 ../../../data/ Twitch 3 4 0 50
+./bin/D-TrimCDP-WB 2 ../../../data/ Twitch 3 5 0 50
 
 cd ../../../code/PrunedDP++
 mkdir build
